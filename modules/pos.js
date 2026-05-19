@@ -278,30 +278,60 @@
     if (!qrSection) return;
 
     const settings = POS.settings.getSettings();
-    // Show QR whenever we have a target + amount — regardless of payment method.
-    // Customer can scan to pay even if we haven't picked "TRANSFER".
-    const shouldShow = settings.promptpayTarget && total > 0;
-
-    if (!shouldShow) {
+    if (!settings.promptpayTarget || total <= 0) {
       qrSection.classList.add('hidden');
+      return;
+    }
+
+    // Validate target
+    const validationError = POS.promptpay.validateTarget(settings.promptpayTarget);
+    if (validationError) {
+      showManagerQrError('เลข PromptPay ผิดรูปแบบ: ' + validationError);
+      return;
+    }
+
+    // Wait for library if needed
+    if (typeof QRCode === 'undefined') {
+      showManagerQrError('กำลังโหลด QR library...');
+      loadQrLibrary(() => renderManagerQr(total));
       return;
     }
 
     try {
       const payload = POS.promptpay.generatePayload(settings.promptpayTarget, total);
+      // Reset section content to the canvas template (in case error state replaced it)
+      qrSection.innerHTML = `
+        <div class="text-xs text-blue-900 font-bold text-center mb-2">📱 QR PromptPay</div>
+        <canvas id="managerQrCanvas" class="mx-auto"></canvas>
+        <div id="managerQrLabel" class="text-center text-xs text-slate-600 mt-1"></div>
+      `;
       const canvas = document.getElementById('managerQrCanvas');
-      if (window.QRCode) {
-        QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 });
-      } else {
-        loadQrLibrary(() => QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 }));
-      }
+      QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 }, (err) => {
+        if (err) {
+          console.error('[POS] QR draw error:', err);
+          showManagerQrError('วาด QR ไม่สำเร็จ');
+          return;
+        }
+      });
       const label = settings.promptpayName ? settings.promptpayName + ' · ' : '';
       document.getElementById('managerQrLabel').textContent = label + '฿' + fmt(total);
       qrSection.classList.remove('hidden');
     } catch (err) {
-      console.error('QR render error:', err);
-      qrSection.classList.add('hidden');
+      console.error('[POS] QR render error:', err);
+      showManagerQrError(err.message || 'สร้าง QR ไม่สำเร็จ');
     }
+  }
+
+  function showManagerQrError(message) {
+    const qrSection = document.getElementById('managerQrSection');
+    if (!qrSection) return;
+    qrSection.classList.remove('hidden');
+    qrSection.classList.remove('bg-blue-50');
+    qrSection.classList.add('bg-red-50');
+    qrSection.innerHTML = `
+      <div class="text-xs text-red-700 font-bold text-center mb-1">⚠️ QR สร้างไม่ได้</div>
+      <div class="text-xs text-red-600 text-center">${escapeHtml(message)}</div>
+    `;
   }
 
   function loadQrLibrary(callback) {
