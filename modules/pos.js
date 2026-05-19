@@ -75,19 +75,24 @@
   function attachListeners() {
     const scanInput = document.getElementById('posScanInput');
     scanInput.addEventListener('keydown', handleScanInput);
-
-    const cartTable = document.getElementById('cartTable');
-    cartTable.addEventListener('click', (e) => {
-      const removeBtn = e.target.closest('[data-cart-remove]');
-      if (removeBtn) removeFromCart(removeBtn.dataset.cartRemove);
-    });
-    cartTable.addEventListener('change', (e) => {
-      const qtyInput = e.target.closest('[data-cart-qty]');
-      if (qtyInput) updateCartQty(qtyInput.dataset.cartQty, qtyInput.value);
-    });
-
     scanInput.focus();
   }
+
+  // Global delegated handlers (attached once on module load)
+  document.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('[data-cart-remove]');
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[POS] Remove cart item:', removeBtn.dataset.cartRemove);
+      removeFromCart(removeBtn.dataset.cartRemove);
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const qtyInput = e.target.closest('[data-cart-qty]');
+    if (qtyInput) updateCartQty(qtyInput.dataset.cartQty, qtyInput.value);
+  });
 
   function handleScanInput(e) {
     if (e.key !== 'Enter') {

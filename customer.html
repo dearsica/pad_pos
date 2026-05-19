@@ -6,7 +6,29 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>หน้าจอลูกค้า — ร้านถั่วน้อย</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+  (function loadQRCode() {
+    const cdns = [
+      'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
+      'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+      'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
+    ];
+    let i = 0;
+    function tryNext() {
+      if (i >= cdns.length) { console.error('All QR CDNs failed'); return; }
+      const s = document.createElement('script');
+      s.src = cdns[i++];
+      s.onerror = tryNext;
+      s.onload = () => {
+        console.log('QR library loaded from:', s.src);
+        // Re-render when library finally loads
+        if (typeof loadAndRender === 'function') loadAndRender();
+      };
+      document.head.appendChild(s);
+    }
+    tryNext();
+  })();
+</script>
 <style>
   body {
     font-family: 'Sarabun', -apple-system, sans-serif;
@@ -124,7 +146,7 @@
 
 // ====== State sync via localStorage ======
 const STATE_KEY = 'pos_customer_display_state';
-const CUSTOMER_VERSION = '2.2.0';
+const CUSTOMER_VERSION = '2.2.3';
 
 console.log('[Customer Display] Version:', CUSTOMER_VERSION);
 
@@ -235,9 +257,19 @@ function showCart(state) {
       qrPlaceholder.classList.add('hidden');
     } catch (err) {
       console.error('[Customer Display] QR render failed:', err);
-      qrSection.classList.add('hidden');
-      qrPlaceholder.classList.remove('hidden');
-      qrPlaceholder.textContent = '⚠️ QR ไม่สามารถสร้างได้';
+      // If library not ready, retry shortly
+      if (err.message && err.message.indexOf('ยังไม่โหลด') >= 0) {
+        qrSection.classList.add('hidden');
+        qrPlaceholder.classList.remove('hidden');
+        qrPlaceholder.textContent = '⏳ กำลังโหลด QR library...';
+        // Retry render every 500ms until QRCode is available
+        clearTimeout(showCart._qrRetry);
+        showCart._qrRetry = setTimeout(() => loadAndRender(), 500);
+      } else {
+        qrSection.classList.add('hidden');
+        qrPlaceholder.classList.remove('hidden');
+        qrPlaceholder.textContent = '⚠️ QR ไม่สามารถสร้างได้: ' + err.message;
+      }
     }
   } else {
     qrSection.classList.add('hidden');
