@@ -50,14 +50,7 @@
 
           <div class="space-y-2 mb-3" id="totalsSection"></div>
 
-          <div class="mb-3">
-            <label class="text-sm text-slate-600">วิธีจ่ายเงิน</label>
-            <select id="paymentMethod" class="w-full border rounded px-2 py-1 text-sm">
-              <option value="CASH">💵 เงินสด</option>
-              <option value="TRANSFER">📱 โอน/พร้อมเพย์</option>
-              <option value="CARD">💳 บัตร</option>
-            </select>
-          </div>
+          <input type="hidden" id="paymentMethod" value="CASH">
 
           <div id="managerQrSection" class="hidden mb-3 bg-blue-50 rounded p-3">
             <div class="text-xs text-blue-900 font-bold text-center mb-2">📱 QR PromptPay</div>
@@ -92,9 +85,6 @@
       const qtyInput = e.target.closest('[data-cart-qty]');
       if (qtyInput) updateCartQty(qtyInput.dataset.cartQty, qtyInput.value);
     });
-
-    const paymentSel = document.getElementById('paymentMethod');
-    if (paymentSel) paymentSel.addEventListener('change', syncCustomerDisplay);
 
     scanInput.focus();
   }
@@ -287,11 +277,10 @@
     const qrSection = document.getElementById('managerQrSection');
     if (!qrSection) return;
 
-    const paymentMethod = document.getElementById('paymentMethod')?.value;
     const settings = POS.settings.getSettings();
-    const shouldShow = paymentMethod === 'TRANSFER'
-                    && settings.promptpayTarget
-                    && total > 0;
+    // Show QR whenever we have a target + amount — regardless of payment method.
+    // Customer can scan to pay even if we haven't picked "TRANSFER".
+    const shouldShow = settings.promptpayTarget && total > 0;
 
     if (!shouldShow) {
       qrSection.classList.add('hidden');
@@ -301,7 +290,6 @@
     try {
       const payload = POS.promptpay.generatePayload(settings.promptpayTarget, total);
       const canvas = document.getElementById('managerQrCanvas');
-      // Use QRCode library if available, else load it on the fly
       if (window.QRCode) {
         QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 });
       } else {

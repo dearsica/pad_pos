@@ -124,7 +124,7 @@
 
 // ====== State sync via localStorage ======
 const STATE_KEY = 'pos_customer_display_state';
-const CUSTOMER_VERSION = '2.1.2';
+const CUSTOMER_VERSION = '2.2.0';
 
 console.log('[Customer Display] Version:', CUSTOMER_VERSION);
 
@@ -221,24 +221,30 @@ function showCart(state) {
     vatBox.classList.add('hidden');
   }
 
-  // QR code (only when payment method is TRANSFER and we have a target + amount)
+  // QR code: show whenever we have a PromptPay target + amount.
   const qrSection = document.getElementById('qrSection');
   const qrPlaceholder = document.getElementById('qrPlaceholder');
-  const shouldShowQr = state.paymentMethod === 'TRANSFER'
-                    && state.settings
+  const shouldShowQr = state.settings
                     && state.settings.promptpayTarget
                     && state.total > 0;
 
   if (shouldShowQr) {
-    renderQr(state.settings.promptpayTarget, state.total, state.settings.promptpayName);
-    qrSection.classList.remove('hidden');
-    qrPlaceholder.classList.add('hidden');
+    try {
+      renderQr(state.settings.promptpayTarget, state.total, state.settings.promptpayName);
+      qrSection.classList.remove('hidden');
+      qrPlaceholder.classList.add('hidden');
+    } catch (err) {
+      console.error('[Customer Display] QR render failed:', err);
+      qrSection.classList.add('hidden');
+      qrPlaceholder.classList.remove('hidden');
+      qrPlaceholder.textContent = '⚠️ QR ไม่สามารถสร้างได้';
+    }
   } else {
     qrSection.classList.add('hidden');
     qrPlaceholder.classList.remove('hidden');
-    qrPlaceholder.textContent = state.paymentMethod === 'TRANSFER'
-      ? '⚠️ กรุณาตั้งค่า PromptPay ในระบบ'
-      : 'เลือกวิธีจ่ายเงินที่เคาน์เตอร์';
+    qrPlaceholder.textContent = state.settings && state.settings.promptpayTarget
+      ? 'รอรายการสินค้า...'
+      : '⚠️ กรุณาตั้งค่า PromptPay ในระบบ';
   }
 }
 
@@ -247,20 +253,21 @@ function showPaid(state) {
   document.getElementById('paidTotal').textContent = '฿' + fmt(state.total || 0);
   document.getElementById('paidSaleId').textContent = state.saleId || '-';
 
-  // Auto-return to idle after a few seconds
   clearTimeout(showPaid._t);
   showPaid._t = setTimeout(() => showIdle(), 8000);
 }
 
 function renderQr(target, amount, name) {
-  // Inline PromptPay generator (avoid duplicate file load)
+  if (typeof QRCode === 'undefined') {
+    throw new Error('QR library ยังไม่โหลด');
+  }
   const payload = generatePromptPayPayload(target, amount);
   const canvas = document.getElementById('qrCanvas');
   QRCode.toCanvas(canvas, payload, {
     width: 220,
     margin: 1,
     color: { dark: '#1e3a8a', light: '#ffffff' }
-  }, err => { if (err) console.error('QR error:', err); });
+  }, err => { if (err) console.error('QR draw error:', err); });
 
   const label = name ? name + ' · ' : '';
   document.getElementById('qrTarget').textContent = label + 'ยอด ฿' + fmt(amount);

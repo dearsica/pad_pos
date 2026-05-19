@@ -36,6 +36,20 @@ button:disabled {
   background: #e2e8f0;
 }
 
+/* ====== Payment toggle buttons ====== */
+.payment-btn {
+  background: white;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.payment-btn.payment-active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  font-weight: 600;
+}
+
 /* ====== Ripple ====== */
 .ripple-effect {
   position: absolute;
