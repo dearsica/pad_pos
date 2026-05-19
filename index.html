@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>POS ร้านถั่วน้อย</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+<!-- Setup Modal -->
+<div id="setupModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+  <div class="bg-white rounded-lg p-6 max-w-md w-11/12">
+    <h2 class="text-xl font-bold mb-4">ตั้งค่า Google Apps Script</h2>
+    <p class="text-sm text-slate-600 mb-3">วาง Web App URL ที่ deploy แล้ว</p>
+    <input id="apiUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec"
+           class="w-full border rounded px-3 py-2 mb-3 text-sm">
+    <div class="flex gap-2">
+      <button onclick="saveApiUrl()" class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">บันทึกและทดสอบ</button>
+      <button onclick="document.getElementById('setupModal').classList.add('hidden')" class="px-4 py-2 border rounded">ยกเลิก</button>
+    </div>
+    <p id="setupStatus" class="text-sm mt-3"></p>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="bg-white shadow-sm sticky top-0 z-40 no-print">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <h1 id="headerShopName" class="text-xl font-bold text-slate-800">🛒 ร้านถั่วน้อย</h1>
+    <div class="flex items-center gap-2">
+      <span id="appVersionBadge" class="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-mono"></span>
+      <span id="apiStatus" class="text-xs px-2 py-1 rounded bg-slate-200">ไม่ได้เชื่อมต่อ</span>
+      <button onclick="openSetup()" class="text-sm px-3 py-1 border rounded hover:bg-slate-100">⚙️</button>
+    </div>
+  </div>
+  <nav class="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+    <button data-tab="pos" class="tab-btn tab-active px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">💰 ขายหน้าร้าน</button>
+    <button data-tab="products" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">📦 สินค้า</button>
+    <button data-tab="stock" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">📥 รับสต๊อก</button>
+    <button data-tab="sales" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">🧾 ประวัติขาย</button>
+    <button data-tab="members" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">👥 สมาชิก</button>
+    <button data-tab="dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">📊 Dashboard</button>
+    <button data-tab="settings" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100">⚙️ ตั้งค่าร้าน</button>
+  </nav>
+</header>
+
+<main class="max-w-7xl mx-auto p-4">
+  <!-- Tabs are loaded by app.js -->
+  <section id="tab-pos" class="tab-content"></section>
+  <section id="tab-products" class="tab-content hidden"></section>
+  <section id="tab-stock" class="tab-content hidden"></section>
+  <section id="tab-sales" class="tab-content hidden"></section>
+  <section id="tab-members" class="tab-content hidden"></section>
+  <section id="tab-dashboard" class="tab-content hidden"></section>
+  <section id="tab-settings" class="tab-content hidden"></section>
+</main>
+
+<!-- Modals (mounted by modules) -->
+<div id="modalRoot"></div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg hidden z-50"></div>
+
+<!-- Module loading order matters: utilities first, then features, then app -->
+<script src="modules/feedback.js"></script>
+<script src="modules/vat.js"></script>
+<script src="modules/images.js"></script>
+<script src="modules/scanner.js"></script>
+<script src="api.js"></script>
+<script src="modules/settings.js"></script>
+<script src="modules/receipts.js"></script>
+<script src="modules/products.js"></script>
+<script src="modules/pos.js"></script>
+<script src="modules/stock.js"></script>
+<script src="modules/sales.js"></script>
+<script src="modules/members.js"></script>
+<script src="modules/dashboard.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
