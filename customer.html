@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>หน้าจอลูกค้า — ร้านถั่วน้อย</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  body {
+    font-family: 'Sarabun', -apple-system, sans-serif;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    min-height: 100vh;
+    color: white;
+    overflow: hidden;
+  }
+
+  .item-row {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pulse-green {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  .paid-animation { animation: pulse-green 0.8s ease-out; }
+
+  .scroll-container::-webkit-scrollbar { width: 8px; }
+  .scroll-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
+  .scroll-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ====== IDLE Screen (no customer) ====== -->
+<div id="screenIdle" class="hidden h-screen flex flex-col items-center justify-center text-center px-8">
+  <div class="text-9xl mb-6">🛒</div>
+  <h1 id="idleShopName" class="text-6xl font-bold mb-3">ร้านถั่วน้อย</h1>
+  <p class="text-2xl opacity-80">ยินดีต้อนรับ</p>
+  <p class="text-lg opacity-60 mt-8">กำลังรอลูกค้ารายต่อไป...</p>
+</div>
+
+<!-- ====== CART Screen (shopping in progress) ====== -->
+<div id="screenCart" class="hidden h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-black/30 backdrop-blur px-8 py-4 flex items-center justify-between">
+    <h1 id="cartShopName" class="text-3xl font-bold">🛒 ร้านถั่วน้อย</h1>
+    <div class="text-sm opacity-70" id="cartItemCount">0 รายการ</div>
+  </header>
+
+  <!-- Items list -->
+  <div class="flex-1 overflow-hidden flex">
+    <div class="flex-1 p-6 overflow-y-auto scroll-container" id="cartItemsContainer">
+      <table class="w-full text-lg">
+        <thead class="text-base opacity-70 border-b border-white/20">
+          <tr>
+            <th class="text-left py-2">สินค้า</th>
+            <th class="text-center py-2 w-20">จำนวน</th>
+            <th class="text-right py-2 w-32">ราคา</th>
+            <th class="text-right py-2 w-32">รวม</th>
+          </tr>
+        </thead>
+        <tbody id="cartItemsList"></tbody>
+      </table>
+    </div>
+
+    <!-- Right side: total + QR -->
+    <div class="w-96 bg-white/10 backdrop-blur p-6 flex flex-col">
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="text-center mb-4">
+          <div class="text-lg opacity-70 mb-2">ยอดรวม</div>
+          <div id="cartTotal" class="text-7xl font-bold">฿0.00</div>
+          <div id="cartVatBreakdown" class="text-sm opacity-60 mt-2 hidden">
+            <div>ก่อน VAT: <span id="cartNet">฿0.00</span></div>
+            <div>VAT 7%: <span id="cartVat">฿0.00</span></div>
+          </div>
+        </div>
+
+        <!-- QR for PromptPay -->
+        <div id="qrSection" class="bg-white rounded-xl p-4 mt-4 hidden">
+          <div class="text-center text-blue-900 mb-2">
+            <div class="text-sm font-bold">📱 สแกนจ่ายด้วย PromptPay</div>
+          </div>
+          <canvas id="qrCanvas" class="mx-auto"></canvas>
+          <div id="qrTarget" class="text-center text-xs text-slate-600 mt-2"></div>
+        </div>
+
+        <div id="qrPlaceholder" class="text-center text-sm opacity-60 mt-4">
+          เลือกวิธีจ่ายเงินที่เคาน์เตอร์
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PAID Screen (transaction complete) ====== -->
+<div id="screenPaid" class="hidden h-screen flex flex-col items-center justify-center text-center px-8">
+  <div class="text-9xl mb-4 paid-animation">✅</div>
+  <h1 class="text-6xl font-bold mb-3">ขอบคุณค่ะ</h1>
+  <p class="text-3xl opacity-90 mb-6">ชำระเงินเรียบร้อย</p>
+  <div class="bg-white/10 backdrop-blur rounded-xl px-12 py-6">
+    <div class="text-xl opacity-70 mb-2">ยอดที่ชำระ</div>
+    <div id="paidTotal" class="text-6xl font-bold">฿0.00</div>
+  </div>
+  <p id="paidShopFooter" class="text-2xl opacity-80 mt-8"></p>
+  <p class="text-sm opacity-50 mt-12">รหัสบิล: <span id="paidSaleId" class="font-mono"></span></p>
+</div>
+
+<script>
+'use strict';
+
+// ====== State sync via localStorage ======
+const STATE_KEY = 'pos_customer_display_state';
+
+function fmt(n) {
+  return Number(n).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function loadAndRender() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) { showIdle(); return; }
+    const state = JSON.parse(raw);
+    render(state);
+  } catch (err) {
+    console.error('Failed to load state:', err);
+    showIdle();
+  }
+}
+
+function render(state) {
+  const settings = state.settings || {};
+  const shopName = settings.shopName || 'ร้านถั่วน้อย';
+  document.getElementById('idleShopName').textContent = shopName;
+  document.getElementById('cartShopName').textContent = '🛒 ' + shopName;
+  document.getElementById('paidShopFooter').textContent = settings.shopFooter || 'ขอบคุณที่ใช้บริการ';
+
+  switch (state.mode) {
+    case 'cart':  showCart(state); break;
+    case 'paid':  showPaid(state); break;
+    case 'idle':
+    default:      showIdle(); break;
+  }
+}
+
+function showScreen(id) {
+  ['screenIdle', 'screenCart', 'screenPaid'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+function showIdle() { showScreen('screenIdle'); }
+
+function showCart(state) {
+  showScreen('screenCart');
+
+  const items = state.items || [];
+  document.getElementById('cartItemCount').textContent = items.length + ' รายการ';
+
+  // Items table
+  const tbody = document.getElementById('cartItemsList');
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-12 opacity-50 text-2xl">ยังไม่มีสินค้า</td></tr>';
+  } else {
+    tbody.innerHTML = items.map(i => `
+      <tr class="item-row border-b border-white/10">
+        <td class="py-3">${escapeHtml(i.name)}</td>
+        <td class="text-center">${i.qty}</td>
+        <td class="text-right">${fmt(i.unit_price)}</td>
+        <td class="text-right font-bold">${fmt(i.unit_price * i.qty)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Totals
+  document.getElementById('cartTotal').textContent = '฿' + fmt(state.total || 0);
+
+  // VAT breakdown (if enabled)
+  const vatBox = document.getElementById('cartVatBreakdown');
+  if (state.settings && state.settings.vatEnabled && state.total > 0) {
+    const total = state.total;
+    const net = total / 1.07;
+    const vat = total - net;
+    document.getElementById('cartNet').textContent = '฿' + fmt(net);
+    document.getElementById('cartVat').textContent = '฿' + fmt(vat);
+    vatBox.classList.remove('hidden');
+  } else {
+    vatBox.classList.add('hidden');
+  }
+
+  // QR code (only when payment method is TRANSFER and we have a target + amount)
+  const qrSection = document.getElementById('qrSection');
+  const qrPlaceholder = document.getElementById('qrPlaceholder');
+  const shouldShowQr = state.paymentMethod === 'TRANSFER'
+                    && state.settings
+                    && state.settings.promptpayTarget
+                    && state.total > 0;
+
+  if (shouldShowQr) {
+    renderQr(state.settings.promptpayTarget, state.total, state.settings.promptpayName);
+    qrSection.classList.remove('hidden');
+    qrPlaceholder.classList.add('hidden');
+  } else {
+    qrSection.classList.add('hidden');
+    qrPlaceholder.classList.remove('hidden');
+    qrPlaceholder.textContent = state.paymentMethod === 'TRANSFER'
+      ? '⚠️ กรุณาตั้งค่า PromptPay ในระบบ'
+      : 'เลือกวิธีจ่ายเงินที่เคาน์เตอร์';
+  }
+}
+
+function showPaid(state) {
+  showScreen('screenPaid');
+  document.getElementById('paidTotal').textContent = '฿' + fmt(state.total || 0);
+  document.getElementById('paidSaleId').textContent = state.saleId || '-';
+
+  // Auto-return to idle after a few seconds
+  clearTimeout(showPaid._t);
+  showPaid._t = setTimeout(() => showIdle(), 8000);
+}
+
+function renderQr(target, amount, name) {
+  // Inline PromptPay generator (avoid duplicate file load)
+  const payload = generatePromptPayPayload(target, amount);
+  const canvas = document.getElementById('qrCanvas');
+  QRCode.toCanvas(canvas, payload, {
+    width: 220,
+    margin: 1,
+    color: { dark: '#1e3a8a', light: '#ffffff' }
+  }, err => { if (err) console.error('QR error:', err); });
+
+  const label = name ? name + ' · ' : '';
+  document.getElementById('qrTarget').textContent = label + 'ยอด ฿' + fmt(amount);
+}
+
+// ====== PromptPay payload generator (inline copy) ======
+function generatePromptPayPayload(target, amount) {
+  const clean = String(target).replace(/[^0-9]/g, '');
+  const tag = clean.length === 10 ? '01' : clean.length === 13 ? '02' : '03';
+  const formatted = clean.length === 10 ? '0066' + clean.substring(1) : clean;
+
+  function tlv(t, v) { return t + String(v.length).padStart(2, '0') + v; }
+
+  const merchant = tlv('00', 'A000000677010111') + tlv(tag, formatted);
+  const fields = [
+    tlv('00', '01'),
+    tlv('01', amount > 0 ? '12' : '11'),
+    tlv('29', merchant),
+    tlv('58', 'TH'),
+    tlv('53', '764')
+  ];
+  if (amount > 0) fields.push(tlv('54', Number(amount).toFixed(2)));
+
+  const partial = fields.join('') + '6304';
+  return partial + computeCrc16(partial);
+}
+
+function computeCrc16(input) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < input.length; i++) {
+    crc ^= input.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+// ====== Listen for changes from manager tab ======
+window.addEventListener('storage', (e) => {
+  if (e.key === STATE_KEY) loadAndRender();
+});
+
+// Initial render
+loadAndRender();
+
+// Auto-refresh every 2 seconds as fallback (in case storage event misses)
+setInterval(loadAndRender, 2000);
+</script>
+</body>
+</html>

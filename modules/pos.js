@@ -59,6 +59,12 @@
             </select>
           </div>
 
+          <div id="managerQrSection" class="hidden mb-3 bg-blue-50 rounded p-3">
+            <div class="text-xs text-blue-900 font-bold text-center mb-2">📱 QR PromptPay</div>
+            <canvas id="managerQrCanvas" class="mx-auto"></canvas>
+            <div id="managerQrLabel" class="text-center text-xs text-slate-600 mt-1"></div>
+          </div>
+
           <button id="checkoutBtn" onclick="POS.pos.checkout()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">
             ✓ คิดเงิน (F2)
           </button>
@@ -86,6 +92,9 @@
       const qtyInput = e.target.closest('[data-cart-qty]');
       if (qtyInput) updateCartQty(qtyInput.dataset.cartQty, qtyInput.value);
     });
+
+    const paymentSel = document.getElementById('paymentMethod');
+    if (paymentSel) paymentSel.addEventListener('change', syncCustomerDisplay);
 
     scanInput.focus();
   }
@@ -230,6 +239,16 @@
       `).join('');
     }
     renderTotals();
+    syncCustomerDisplay();
+  }
+
+  function syncCustomerDisplay() {
+    if (!cart.length) {
+      POS.customerDisplay.publishIdle();
+      return;
+    }
+    const paymentMethod = document.getElementById('paymentMethod')?.value || 'CASH';
+    POS.customerDisplay.publishCart(cart, paymentMethod);
   }
 
   function renderTotals() {
@@ -261,6 +280,48 @@
     </div>`);
 
     section.innerHTML = rows.join('');
+    renderManagerQr(total);
+  }
+
+  function renderManagerQr(total) {
+    const qrSection = document.getElementById('managerQrSection');
+    if (!qrSection) return;
+
+    const paymentMethod = document.getElementById('paymentMethod')?.value;
+    const settings = POS.settings.getSettings();
+    const shouldShow = paymentMethod === 'TRANSFER'
+                    && settings.promptpayTarget
+                    && total > 0;
+
+    if (!shouldShow) {
+      qrSection.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const payload = POS.promptpay.generatePayload(settings.promptpayTarget, total);
+      const canvas = document.getElementById('managerQrCanvas');
+      // Use QRCode library if available, else load it on the fly
+      if (window.QRCode) {
+        QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 });
+      } else {
+        loadQrLibrary(() => QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 }));
+      }
+      const label = settings.promptpayName ? settings.promptpayName + ' · ' : '';
+      document.getElementById('managerQrLabel').textContent = label + '฿' + fmt(total);
+      qrSection.classList.remove('hidden');
+    } catch (err) {
+      console.error('QR render error:', err);
+      qrSection.classList.add('hidden');
+    }
+  }
+
+  function loadQrLibrary(callback) {
+    if (window.QRCode) { callback(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    script.onload = callback;
+    document.head.appendChild(script);
   }
 
   // ====== Member lookup ======
@@ -317,9 +378,9 @@
     try {
       const result = await callApi('createSale', { body: payload });
       POS.feedback.playCheckoutSuccess();
+      POS.customerDisplay.publishPaid(result.sale_id, cart, result.total, payload.payment_method);
       POS.receipts.show(result, cart, payload);
       showToast('ขายสำเร็จ ' + result.sale_id);
-      const savedCart = [...cart];
       clearCart();
       POS.products.loadAll();
     } catch (err) {

@@ -14,7 +14,9 @@
     shopBranch: 'สำนักงานใหญ่',
     shopFooter: 'ขอบคุณที่ใช้บริการ',
     vatEnabled: false,
-    receiptHeader: ''
+    receiptHeader: '',
+    promptpayTarget: '',
+    promptpayName: ''
   };
 
   function getSettings() {
@@ -81,6 +83,40 @@
           </p>
         </div>
 
+        <h3 class="font-bold text-sm mt-6 mb-2 text-slate-700">💰 PromptPay (รับเงินโอน)</h3>
+        <div class="bg-slate-50 p-3 rounded space-y-3">
+          <div>
+            <label class="text-sm font-medium">เบอร์พร้อมเพย์ / เลขบัตร ปชช.</label>
+            <input id="setPromptpayTarget" value="${escapeHtml(s.promptpayTarget)}"
+                   placeholder="0812345678 หรือ 1234567890123"
+                   class="w-full border rounded px-3 py-2 font-mono">
+            <p class="text-xs text-slate-500 mt-1">
+              เบอร์โทร 10 หลัก, เลขบัตร ปชช. 13 หลัก, หรือ e-wallet 15 หลัก
+            </p>
+          </div>
+          <div>
+            <label class="text-sm font-medium">ชื่อผู้รับเงิน (แสดงใต้ QR)</label>
+            <input id="setPromptpayName" value="${escapeHtml(s.promptpayName)}"
+                   placeholder="ร้านถั่วน้อย" class="w-full border rounded px-3 py-2">
+          </div>
+          <p class="text-xs text-slate-600">
+            • QR Code จะสร้างอัตโนมัติตามยอดเมื่อลูกค้าเลือก "โอน/พร้อมเพย์"<br>
+            • แสดงในหน้าจอลูกค้า (จอที่ 2)
+          </p>
+        </div>
+
+        <h3 class="font-bold text-sm mt-6 mb-2 text-slate-700">📺 หน้าจอลูกค้า</h3>
+        <div class="bg-slate-50 p-3 rounded">
+          <button onclick="POS.customerDisplay.openCustomerWindow()" class="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700">
+            🖥️ เปิดหน้าจอลูกค้า (แท็บใหม่)
+          </button>
+          <p class="text-xs text-slate-600 mt-2">
+            • กดเปิดแล้วลากหน้าต่างไปจอที่ 2 (จอที่หันหาลูกค้า)<br>
+            • หน้าจอจะแสดงรายการสินค้า ยอดรวม และ QR PromptPay (ถ้าเลือกโอน)<br>
+            • อัปเดตอัตโนมัติทุกครั้งที่เพิ่ม/ลบสินค้าในตะกร้า
+          </p>
+        </div>
+
         <h3 class="font-bold text-sm mt-6 mb-2 text-slate-700">🧾 ใบเสร็จ</h3>
         <div class="space-y-3">
           <div>
@@ -126,6 +162,15 @@
   }
 
   function save() {
+    const target = document.getElementById('setPromptpayTarget').value.trim();
+    if (target) {
+      const error = POS.promptpay.validateTarget(target);
+      if (error) {
+        showToast('PromptPay: ' + error, 'error');
+        return;
+      }
+    }
+
     const settings = {
       shopName: document.getElementById('setShopName').value.trim() || DEFAULT_SETTINGS.shopName,
       shopAddress: document.getElementById('setShopAddress').value.trim(),
@@ -134,7 +179,9 @@
       shopTaxId: document.getElementById('setShopTaxId').value.trim(),
       vatEnabled: document.getElementById('setVatEnabled').checked,
       receiptHeader: document.getElementById('setReceiptHeader').value.trim(),
-      shopFooter: document.getElementById('setShopFooter').value.trim()
+      shopFooter: document.getElementById('setShopFooter').value.trim(),
+      promptpayTarget: target,
+      promptpayName: document.getElementById('setPromptpayName').value.trim()
     };
     saveSettings(settings);
     applyShopNameToHeader(settings.shopName);
