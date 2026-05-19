@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  window.APP_VERSION = '2.3.0';
+  window.APP_VERSION = '2.3.1';
   window.APP_BUILD_DATE = '2026-05-19';
 
   // ====== Tab routing ======

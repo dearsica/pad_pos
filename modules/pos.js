@@ -151,7 +151,10 @@
   }
 
   function addToCart(product) {
-    const existing = cart.find(item => item.barcode === product.barcode);
+    // Normalize barcode to string to avoid type-mismatch bugs
+    // (Google Sheet may return numeric barcodes as numbers).
+    const productBarcodeStr = String(product.barcode);
+    const existing = cart.find(item => String(item.barcode) === productBarcodeStr);
     if (existing) {
       if (existing.qty + 1 > Number(product.stock)) {
         POS.feedback.playScanError();
@@ -166,7 +169,7 @@
         return;
       }
       cart.push({
-        barcode: product.barcode,
+        barcode: productBarcodeStr,    // always string
         name: product.name,
         image: product.image || '',
         qty: 1,
@@ -180,7 +183,7 @@
   }
 
   function updateCartQty(barcode, qty) {
-    const item = cart.find(i => i.barcode === barcode);
+    const item = cart.find(i => String(i.barcode) === String(barcode));
     if (!item) return;
     const n = Number(qty);
     if (n <= 0) { removeFromCart(barcode); return; }
@@ -190,7 +193,7 @@
   }
 
   function removeFromCart(barcode) {
-    cart = cart.filter(i => i.barcode !== barcode);
+    cart = cart.filter(i => String(i.barcode) !== String(barcode));
     renderCart();
   }
 
