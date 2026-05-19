@@ -199,17 +199,17 @@
     renderCart();
   }
 
-  function clearCart() {
+  function clearCart(options = {}) {
     cart = [];
     currentMember = null;
     const phoneEl = document.getElementById('memberPhoneInput');
     const infoEl = document.getElementById('memberInfo');
     if (phoneEl) phoneEl.value = '';
     if (infoEl) infoEl.textContent = '';
-    renderCart();
+    renderCart({ skipPublish: options.skipPublish });
   }
 
-  function renderCart() {
+  function renderCart(options = {}) {
     const tbody = document.getElementById('cartTable');
     if (!tbody) return;
     if (!cart.length) {
@@ -239,7 +239,7 @@
       `).join('');
     }
     renderTotals();
-    syncCustomerDisplay();
+    if (!options.skipPublish) syncCustomerDisplay();
   }
 
   function syncCustomerDisplay() {
@@ -374,14 +374,25 @@
       note: ''
     };
 
+    // Snapshot cart BEFORE clearing — we need it for the receipt and customer display
+    const cartSnapshot = cart.map(i => ({ ...i }));
+    const totalSnapshot = cartSnapshot.reduce((s, i) => s + i.unit_price * i.qty, 0);
+
     setCheckoutLoading(true);
     try {
       const result = await callApi('createSale', { body: payload });
       POS.feedback.playCheckoutSuccess();
-      POS.customerDisplay.publishPaid(result.sale_id, cart, result.total, payload.payment_method);
-      POS.receipts.show(result, cart, payload);
+
+      // Use API total if valid, else fall back to local calc.
+      // (API can return total as string; coerce to number)
+      const finalTotal = Number(result.total) > 0 ? Number(result.total) : totalSnapshot;
+
+      // Clear cart FIRST (resets manager UI) then publish Paid to customer.
+      // Order matters: clearCart triggers publishIdle, so publishPaid must come AFTER.
+      clearCart({ skipPublish: true });
+      POS.customerDisplay.publishPaid(result.sale_id, cartSnapshot, finalTotal, payload.payment_method);
+      POS.receipts.show(result, cartSnapshot, payload);
       showToast('ขายสำเร็จ ' + result.sale_id);
-      clearCart();
       POS.products.loadAll();
     } catch (err) {
       POS.feedback.playScanError();
