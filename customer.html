@@ -6,29 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>หน้าจอลูกค้า — ร้านถั่วน้อย</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script>
-  (function loadQRCode() {
-    const cdns = [
-      'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
-      'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-      'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
-    ];
-    let i = 0;
-    function tryNext() {
-      if (i >= cdns.length) { console.error('All QR CDNs failed'); return; }
-      const s = document.createElement('script');
-      s.src = cdns[i++];
-      s.onerror = tryNext;
-      s.onload = () => {
-        console.log('QR library loaded from:', s.src);
-        // Re-render when library finally loads
-        if (typeof loadAndRender === 'function') loadAndRender();
-      };
-      document.head.appendChild(s);
-    }
-    tryNext();
-  })();
-</script>
+<script src="modules/qrcode-lib.js"></script>
 <style>
   body {
     font-family: 'Sarabun', -apple-system, sans-serif;
@@ -146,7 +124,7 @@
 
 // ====== State sync via localStorage ======
 const STATE_KEY = 'pos_customer_display_state';
-const CUSTOMER_VERSION = '2.2.3';
+const CUSTOMER_VERSION = '2.3.0';
 
 console.log('[Customer Display] Version:', CUSTOMER_VERSION);
 
@@ -290,19 +268,42 @@ function showPaid(state) {
 }
 
 function renderQr(target, amount, name) {
-  if (typeof QRCode === 'undefined') {
+  if (typeof window.qrcode !== 'function') {
     throw new Error('QR library ยังไม่โหลด');
   }
   const payload = generatePromptPayPayload(target, amount);
   const canvas = document.getElementById('qrCanvas');
-  QRCode.toCanvas(canvas, payload, {
-    width: 220,
-    margin: 1,
-    color: { dark: '#1e3a8a', light: '#ffffff' }
-  }, err => { if (err) console.error('QR draw error:', err); });
-
+  drawQrInline(canvas, payload, 220);
   const label = name ? name + ' · ' : '';
   document.getElementById('qrTarget').textContent = label + 'ยอด ฿' + fmt(amount);
+}
+
+function drawQrInline(canvas, text, size) {
+  const qr = window.qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  const moduleCount = qr.getModuleCount();
+  const margin = 1;
+  const total = moduleCount + margin * 2;
+  const moduleSize = size / total;
+  const actualSize = Math.floor(moduleSize * total);
+
+  canvas.width = actualSize;
+  canvas.height = actualSize;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, actualSize, actualSize);
+  ctx.fillStyle = '#1e3a8a';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qr.isDark(row, col)) {
+        const x = Math.floor((col + margin) * moduleSize);
+        const y = Math.floor((row + margin) * moduleSize);
+        const w = Math.ceil(moduleSize);
+        ctx.fillRect(x, y, w, w);
+      }
+    }
+  }
 }
 
 // ====== PromptPay payload generator (inline copy) ======

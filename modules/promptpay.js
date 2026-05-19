@@ -20,6 +20,49 @@
   const CURRENCY_THB = '764';
 
   /**
+   * Draw a QR code onto a canvas element.
+   * Uses the embedded qrcode-generator library (window.qrcode).
+   */
+  function drawQrToCanvas(canvas, text, options = {}) {
+    if (typeof window.qrcode !== 'function') {
+      throw new Error('QR library not loaded');
+    }
+    const size = options.size || 200;
+    const margin = options.margin === undefined ? 1 : options.margin;
+    const darkColor = options.dark || '#000000';
+    const lightColor = options.light || '#ffffff';
+
+    // qrcode-generator: typeNumber=0 means auto-detect best size
+    const qr = window.qrcode(0, options.errorLevel || 'M');
+    qr.addData(text);
+    qr.make();
+
+    const moduleCount = qr.getModuleCount();
+    const totalModules = moduleCount + margin * 2;
+    const moduleSize = size / totalModules;
+    const actualSize = Math.floor(moduleSize * totalModules);
+
+    canvas.width = actualSize;
+    canvas.height = actualSize;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = lightColor;
+    ctx.fillRect(0, 0, actualSize, actualSize);
+
+    ctx.fillStyle = darkColor;
+    for (let row = 0; row < moduleCount; row++) {
+      for (let col = 0; col < moduleCount; col++) {
+        if (qr.isDark(row, col)) {
+          const x = Math.floor((col + margin) * moduleSize);
+          const y = Math.floor((row + margin) * moduleSize);
+          const w = Math.ceil(moduleSize);
+          ctx.fillRect(x, y, w, w);
+        }
+      }
+    }
+  }
+
+  /**
    * Generate PromptPay QR payload string.
    * @param {string} target - phone (10 digits) or national ID (13 digits) or ewallet (15 digits)
    * @param {number} amount - amount in THB (optional)
@@ -106,5 +149,5 @@
   }
 
   window.POS = window.POS || {};
-  window.POS.promptpay = { generatePayload, validateTarget };
+  window.POS.promptpay = { generatePayload, validateTarget, drawQrToCanvas };
 })();

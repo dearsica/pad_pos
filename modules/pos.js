@@ -288,38 +288,24 @@
       return;
     }
 
-    // Validate target
     const validationError = POS.promptpay.validateTarget(settings.promptpayTarget);
     if (validationError) {
       showManagerQrError('เลข PromptPay ผิดรูปแบบ: ' + validationError);
       return;
     }
 
-    // Wait for library if needed
-    if (typeof QRCode === 'undefined') {
-      showManagerQrError('กำลังโหลด QR library...');
-      loadQrLibrary(() => renderManagerQr(total));
-      return;
-    }
-
     try {
       const payload = POS.promptpay.generatePayload(settings.promptpayTarget, total);
-      // Reset section content to the canvas template (in case error state replaced it)
+      const label = settings.promptpayName ? settings.promptpayName + ' · ' : '';
+      qrSection.classList.remove('bg-red-50');
+      qrSection.classList.add('bg-blue-50');
       qrSection.innerHTML = `
         <div class="text-xs text-blue-900 font-bold text-center mb-2">📱 QR PromptPay</div>
         <canvas id="managerQrCanvas" class="mx-auto"></canvas>
-        <div id="managerQrLabel" class="text-center text-xs text-slate-600 mt-1"></div>
+        <div class="text-center text-xs text-slate-600 mt-1">${escapeHtml(label)}฿${fmt(total)}</div>
       `;
       const canvas = document.getElementById('managerQrCanvas');
-      QRCode.toCanvas(canvas, payload, { width: 160, margin: 1 }, (err) => {
-        if (err) {
-          console.error('[POS] QR draw error:', err);
-          showManagerQrError('วาด QR ไม่สำเร็จ');
-          return;
-        }
-      });
-      const label = settings.promptpayName ? settings.promptpayName + ' · ' : '';
-      document.getElementById('managerQrLabel').textContent = label + '฿' + fmt(total);
+      POS.promptpay.drawQrToCanvas(canvas, payload, { size: 160 });
       qrSection.classList.remove('hidden');
     } catch (err) {
       console.error('[POS] QR render error:', err);
@@ -337,14 +323,6 @@
       <div class="text-xs text-red-700 font-bold text-center mb-1">⚠️ QR สร้างไม่ได้</div>
       <div class="text-xs text-red-600 text-center">${escapeHtml(message)}</div>
     `;
-  }
-
-  function loadQrLibrary(callback) {
-    if (window.QRCode) { callback(); return; }
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-    script.onload = callback;
-    document.head.appendChild(script);
   }
 
   // ====== Member lookup ======

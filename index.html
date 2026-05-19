@@ -9,26 +9,7 @@
 <title>POS ร้านถั่วน้อย</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script>
-  // Load QRCode library with multiple CDN fallbacks
-  (function loadQRCode() {
-    const cdns = [
-      'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js',
-      'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
-      'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js'
-    ];
-    let i = 0;
-    function tryNext() {
-      if (i >= cdns.length) { console.error('All QR CDNs failed'); return; }
-      const s = document.createElement('script');
-      s.src = cdns[i++];
-      s.onerror = tryNext;
-      s.onload = () => console.log('QR library loaded from:', s.src);
-      document.head.appendChild(s);
-    }
-    tryNext();
-  })();
-</script>
+<script src="modules/qrcode-lib.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-100 min-h-screen">
